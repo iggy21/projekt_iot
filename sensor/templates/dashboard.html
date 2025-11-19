@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Monitor temperatury</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background: white;
+            color: #222;
+        }
+
+        .page {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px 60px;
+        }
+
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: normal;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .logout-btn {
+            border: 1px solid #222;
+            background: white;
+            color: #222;
+            padding: 10px 18px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .logout-btn:hover {
+            background: #f5f5f5;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 18px;
+            background: white;
+        }
+
+        .card h3 {
+            font-size: 15px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .value {
+            font-size: 30px;
+            font-weight: normal;
+        }
+
+        .unit {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: normal;
+            margin-bottom: 12px;
+        }
+
+        #readings {
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 15px 18px;
+            font-size: 14px;
+        }
+
+        .reading-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .reading-item:last-child {
+            border-bottom: none;
+        }
+
+        .reading-item small {
+            color: #666;
+        }
+
+        .loading {
+            color: #888;
+        }
+
+        @media (max-width: 600px) {
+            .page {
+                padding: 30px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <div>
+                <h1>Monitor temperatury</h1>
+            </div>
+            <button class="logout-btn">Wyloguj się</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h3>Aktualna temperatura</h3>
+                <div class="value" id="current-temp">--</div>
+                <div class="unit">°C</div>
+            </div>
+
+            <div class="card">
+                <h3>Średnia</h3>
+                <div class="value" id="avg-temp">--</div>
+                <div class="unit">°C</div>
+            </div>
+
+            <div class="card">
+                <h3>Wilgotność</h3>
+                <div class="value" id="humidity">--</div>
+                <div class="unit">%</div>
+            </div>
+
+            <div class="card">
+                <h3>Statystyki</h3>
+                <p>Min: <strong id="min-temp">--</strong> °C</p>
+                <p>Max: <strong id="max-temp">--</strong> °C</p>
+                <p>Ilość: <strong id="count">--</strong></p>
+            </div>
+        </div>
+
+        <h2>Ostatnie odczyty</h2>
+        <div id="readings" class="loading">Ładowanie danych...</div>
+    </div>
+
+    <script>
+        async function fetchData() {
+            try {
+                const latestResponse = await fetch('/sensor/api/readings/latest/', {
+                    credentials: 'include'
+                });
+                if (latestResponse.ok) {
+                    const latest = await latestResponse.json();
+                    document.getElementById('current-temp').textContent = latest.temperature?.toFixed(1) || '--';
+                    document.getElementById('humidity').textContent = latest.humidity?.toFixed(1) || '--';
+                }
+
+                const avgResponse = await fetch('/sensor/api/readings/average/', {
+                    credentials: 'include'
+                });
+                if (avgResponse.ok) {
+                    const avg = await avgResponse.json();
+                    document.getElementById('avg-temp').textContent = avg.average_temperature?.toFixed(1) || '--';
+                }
+
+                const statsResponse = await fetch('/sensor/api/readings/statistics/', {
+                    credentials: 'include'
+                });
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('min-temp').textContent = stats.min?.toFixed(1) || '--';
+                    document.getElementById('max-temp').textContent = stats.max?.toFixed(1) || '--';
+                    document.getElementById('count').textContent = stats.count || '--';
+                }
+
+                const readingsResponse = await fetch('/sensor/api/readings/', {
+                    credentials: 'include'
+                });
+                if (readingsResponse.ok) {
+                    const readings = await readingsResponse.json();
+                    const readingsDiv = document.getElementById('readings');
+                    
+                    if (readings.length === 0) {
+                        readingsDiv.innerHTML = '<p>Brak odczytów</p>';
+                    } else {
+                        readingsDiv.innerHTML = readings.slice(0, 10).map(reading => {
+                            const date = new Date(reading.timestamp);
+                            return `
+                                <div class="reading-item">
+                                    <strong>${reading.temperature.toFixed(1)}°C</strong>
+                                    ${reading.humidity ? ` | Wilgotność: ${reading.humidity.toFixed(1)}%` : ''}
+                                    <br>
+                                    <small>${date.toLocaleString('pl-PL')}</small>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Błąd pobierania danych:', error);
+                document.getElementById('readings').innerHTML = '<p style="color:red;">Błąd pobierania danych</p>';
+            }
+        }
+
+        fetchData();
+
+        setInterval(fetchData, 5000);
+
+        document.querySelector('.logout-btn').addEventListener('click', function() {
+            window.location.href = '/logout/';
+        });
+    </script>
+</body>
+</html>
